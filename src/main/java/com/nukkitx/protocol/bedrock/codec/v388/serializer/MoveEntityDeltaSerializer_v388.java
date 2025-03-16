@@ -1,0 +1,53 @@
+package com.nukkitx.protocol.bedrock.codec.v388.serializer;
+
+import com.nukkitx.protocol.bedrock.codec.BedrockCodecHelper;
+import com.nukkitx.protocol.bedrock.codec.v291.serializer.MoveEntityDeltaSerializer_v291;
+import com.nukkitx.protocol.bedrock.packet.MoveEntityDeltaPacket;
+import com.nukkitx.protocol.common.util.TriConsumer;
+import com.nukkitx.protocol.common.util.VarInts;
+import io.netty.buffer.ByteBuf;
+import java.util.Set;
+
+public class MoveEntityDeltaSerializer_v388 extends MoveEntityDeltaSerializer_v291 {
+   public static final MoveEntityDeltaSerializer_v388 INSTANCE = new MoveEntityDeltaSerializer_v388();
+
+   public void serialize(ByteBuf buffer, BedrockCodecHelper helper, MoveEntityDeltaPacket packet) {
+      VarInts.writeUnsignedLong(buffer, packet.getRuntimeEntityId());
+      int flagsIndex = buffer.writerIndex();
+      buffer.writeShortLE(0);
+      int flags = 65535;
+
+      for(MoveEntityDeltaPacket.Flag flag : FLAGS) {
+         if (!packet.getFlags().contains(flag)) {
+            flags &= ~(1 << flag.ordinal());
+         } else {
+            TriConsumer<ByteBuf, BedrockCodecHelper, MoveEntityDeltaPacket> writer = (TriConsumer)this.writers.get(flag);
+            if (writer != null) {
+               writer.accept(buffer, helper, packet);
+            }
+         }
+      }
+
+      buffer.setShortLE(flagsIndex, flags);
+   }
+
+   public void deserialize(ByteBuf buffer, BedrockCodecHelper helper, MoveEntityDeltaPacket packet) {
+      packet.setRuntimeEntityId(VarInts.readUnsignedLong(buffer));
+      int flags = buffer.readUnsignedShortLE();
+      Set<MoveEntityDeltaPacket.Flag> flagSet = packet.getFlags();
+
+      for(MoveEntityDeltaPacket.Flag flag : FLAGS) {
+         if ((flags & 1 << flag.ordinal()) != 0) {
+            flagSet.add(flag);
+            TriConsumer<ByteBuf, BedrockCodecHelper, MoveEntityDeltaPacket> reader = (TriConsumer)this.readers.get(flag);
+            if (reader != null) {
+               reader.accept(buffer, helper, packet);
+            }
+         }
+      }
+
+   }
+
+   protected MoveEntityDeltaSerializer_v388() {
+   }
+}

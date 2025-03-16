@@ -1,0 +1,18 @@
+package com.nukkitx.protocol.bedrock.data.structure;
+
+public enum StructureAnimationMode {
+   NONE,
+   LAYER,
+   BLOCKS;
+
+   private static final StructureAnimationMode[] VALUES = values();
+
+   public static StructureAnimationMode from(int id) {
+      return VALUES[id];
+   }
+
+   // $FF: synthetic method
+   private static StructureAnimationMode[] $values() {
+      return new StructureAnimationMode[]{NONE, LAYER, BLOCKS};
+   }
+}

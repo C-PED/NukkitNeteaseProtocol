@@ -1,0 +1,60 @@
+package com.nukkitx.protocol.bedrock.codec.v419.serializer;
+
+import com.nukkitx.protocol.bedrock.codec.BedrockCodecHelper;
+import com.nukkitx.protocol.bedrock.codec.v407.serializer.ItemStackResponseSerializer_v407;
+import com.nukkitx.protocol.bedrock.data.inventory.ContainerSlotType;
+import com.nukkitx.protocol.bedrock.data.inventory.itemstack.response.ItemStackResponse;
+import com.nukkitx.protocol.bedrock.data.inventory.itemstack.response.ItemStackResponseContainer;
+import com.nukkitx.protocol.bedrock.data.inventory.itemstack.response.ItemStackResponseSlot;
+import com.nukkitx.protocol.bedrock.data.inventory.itemstack.response.ItemStackResponseStatus;
+import com.nukkitx.protocol.bedrock.packet.ItemStackResponsePacket;
+import com.nukkitx.protocol.common.util.TriConsumer;
+import com.nukkitx.protocol.common.util.VarInts;
+import io.netty.buffer.ByteBuf;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
+
+public class ItemStackResponseSerializer_v419 extends ItemStackResponseSerializer_v407 {
+   public static final ItemStackResponseSerializer_v419 INSTANCE = new ItemStackResponseSerializer_v419();
+
+   @Override
+   public void serialize(ByteBuf buffer, BedrockCodecHelper helper, ItemStackResponsePacket packet) {
+      helper.writeArray(buffer, packet.getEntries(), (buf, response) -> {
+         buf.writeByte(response.getResult().ordinal());
+         VarInts.writeInt(buffer, response.getRequestId());
+
+         if (response.getResult() != ItemStackResponseStatus.OK)
+            return;
+
+         helper.writeArray(buf, response.getContainers(), (buf2, containerEntry) -> {
+            helper.writeContainerSlotType(buf2, containerEntry.getContainer());
+            helper.writeArray(buf2, containerEntry.getItems(), this::writeItemEntry);
+         });
+      });
+   }
+
+   @Override
+   public void deserialize(ByteBuf buffer, BedrockCodecHelper helper, ItemStackResponsePacket packet) {
+      List<ItemStackResponse> entries = packet.getEntries();
+      helper.readArray(buffer, entries, buf -> {
+         ItemStackResponseStatus result = ItemStackResponseStatus.values()[buf.readByte()];
+         int requestId = VarInts.readInt(buf);
+
+         if (result != ItemStackResponseStatus.OK)
+            return new ItemStackResponse(result, requestId, Collections.emptyList());
+
+         List<ItemStackResponseContainer> containerEntries = new ArrayList<>();
+         helper.readArray(buf, containerEntries, buf2 -> {
+            ContainerSlotType container = helper.readContainerSlotType(buf2);
+
+            List<ItemStackResponseSlot> itemEntries = new ArrayList<>();
+            helper.readArray(buf2, itemEntries, byteBuf -> this.readItemEntry(buf2, helper));
+            return new ItemStackResponseContainer(container, itemEntries);
+         });
+         return new ItemStackResponse(result, requestId, containerEntries);
+      });
+   }
+}
